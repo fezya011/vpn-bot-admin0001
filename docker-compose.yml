@@ -1,0 +1,9 @@
+services:
+  admin-bot:
+    build: .
+    container_name: admin-bot
+    restart: always
+    env_file: .env
+    volumes:
+      # ВНИМАНИЕ: доступ к docker.sock = root на хосте. Держи ADMIN_IDS строгим.
+      - /var/run/docker.sock:/var/run/docker.sock

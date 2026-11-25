@@ -1,0 +1,381 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+The content has been processed where content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+app/
+  __init__.py
+  config.py
+  containers.py
+  handlers.py
+  keyboards.py
+  main.py
+  monitor.py
+  system.py
+.dockerignore
+.env.example
+.gitignore
+docker-compose.yml
+Dockerfile
+README.md
+requirements.txt
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="app/__init__.py">
+
+</file>
+
+<file path="app/config.py">
+class Settings(BaseSettings)
+⋮----
+model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+⋮----
+bot_token: str
+admin_ids: list[int]
+protected_containers: list[str] = []
+allow_host_reboot: bool = False
+self_container: str = "admin-bot"
+⋮----
+monitor_interval: int = 60
+ram_alert_percent: int = 90
+disk_alert_percent: int = 90
+⋮----
+@lru_cache
+def get_settings() -> Settings
+</file>
+
+<file path="app/containers.py">
+class Docker
+⋮----
+"""Синхронная обёртка над docker SDK. Вызывать через asyncio.to_thread."""
+⋮----
+def __init__(self, s: Settings)
+⋮----
+def can_restart(self, name: str) -> bool
+⋮----
+def list_containers(self) -> list[dict]
+⋮----
+out = [
+⋮----
+def basic(self, cid: str) -> dict
+⋮----
+c = self.client.containers.get(cid)
+⋮----
+def detail(self, cid: str) -> dict
+⋮----
+st = c.attrs["State"]
+info = {
+⋮----
+started = datetime.strptime(st["StartedAt"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=UTC)
+⋮----
+s = c.stats(stream=False)
+⋮----
+cpu_d = cpu_s.get("cpu_usage", {}).get("total_usage", 0) - pre.get("cpu_usage", {}).get("total_usage", 0)
+sys_d = cpu_s.get("system_cpu_usage", 0) - pre.get("system_cpu_usage", 0)
+ncpu = cpu_s.get("online_cpus") or 1
+⋮----
+ms = s.get("memory_stats", {})
+cache = ms.get("stats", {}).get("inactive_file", ms.get("stats", {}).get("total_inactive_file", 0))
+⋮----
+def logs(self, cid: str, tail: int = 40) -> str
+⋮----
+def restart(self, cid: str) -> None
+⋮----
+def reboot_host(self) -> None
+⋮----
+# Одноразовый привилегированный контейнер входит в namespaces хоста и вызывает reboot
+</file>
+
+<file path="app/handlers.py">
+router = Router()
+log = logging.getLogger("admin")
+MENU = "🛠 <b>Админ-панель</b>"
+⋮----
+async def edit(c: CallbackQuery, text: str, markup=None) -> None
+⋮----
+def _gb(b: int | None) -> str
+⋮----
+def _mb(b: int | None) -> str
+⋮----
+def containers_text(items: list[dict]) -> str
+⋮----
+lines = [f"{kb.icon(c)} <code>{html.escape(c['name'])}</code> — {c['status']}" for c in items]
+⋮----
+def detail_text(i: dict) -> str
+⋮----
+lines = [
+⋮----
+limit = i["mem_limit"]
+⋮----
+@router.message(CommandStart())
+@router.message(Command("menu"))
+async def menu_cmd(m: Message, settings)
+⋮----
+@router.callback_query(F.data == "menu")
+async def menu_cb(c: CallbackQuery, settings)
+⋮----
+@router.message(Command("status"))
+async def status_cmd(m: Message)
+⋮----
+snap = await asyncio.to_thread(system.snapshot)
+⋮----
+@router.callback_query(F.data == "srv")
+async def server(c: CallbackQuery)
+⋮----
+@router.callback_query(F.data == "ctrs")
+async def containers(c: CallbackQuery, ops: Docker)
+⋮----
+items = await asyncio.to_thread(ops.list_containers)
+⋮----
+async def show_detail(c: CallbackQuery, ops: Docker, cid: str) -> None
+⋮----
+info = await asyncio.to_thread(ops.detail, cid)
+⋮----
+@router.callback_query(F.data.startswith("c:"))
+async def detail(c: CallbackQuery, ops: Docker)
+⋮----
+@router.callback_query(F.data.startswith("l:"))
+async def container_logs(c: CallbackQuery, ops: Docker)
+⋮----
+cid = c.data.split(":", 1)[1]
+⋮----
+text = await asyncio.to_thread(ops.logs, cid)
+⋮----
+text = html.escape(text[-3500:]) or "(пусто)"
+⋮----
+@router.callback_query(F.data.startswith("r:"))
+async def restart_confirm(c: CallbackQuery, ops: Docker)
+⋮----
+info = await asyncio.to_thread(ops.basic, cid)
+⋮----
+@router.callback_query(F.data.startswith("rc:"))
+async def restart_do(c: CallbackQuery, ops: Docker)
+⋮----
+@router.callback_query(F.data == "hr")
+async def reboot_confirm(c: CallbackQuery, settings)
+⋮----
+@router.callback_query(F.data == "hrc")
+async def reboot_do(c: CallbackQuery, ops: Docker, settings)
+</file>
+
+<file path="app/keyboards.py">
+ICONS = {"running": "🟢", "exited": "🔴", "restarting": "🟡", "paused": "⏸", "dead": "💀"}
+⋮----
+def icon(c: dict) -> str
+⋮----
+def menu(allow_reboot: bool) -> Kb
+⋮----
+rows = [
+⋮----
+def refresh(target: str) -> Kb
+⋮----
+def containers(items: list[dict]) -> Kb
+⋮----
+rows = [[Btn(text=f"{icon(c)} {c['name']}", callback_data=f"c:{c['id']}")] for c in items[:40]]
+⋮----
+def detail(cid: str, can_restart: bool) -> Kb
+⋮----
+first = [Btn(text="📜 Логи", callback_data=f"l:{cid}"), Btn(text="🔄 Обновить", callback_data=f"c:{cid}")]
+rows = [first]
+⋮----
+def confirm(yes: str, no: str, label: str) -> Kb
+⋮----
+def logs(cid: str) -> Kb
+</file>
+
+<file path="app/main.py">
+class AdminOnly(BaseMiddleware)
+⋮----
+"""Чужие апдейты молча отбрасываются — бот для посторонних как будто не существует."""
+⋮----
+def __init__(self, admin_ids: list[int])
+⋮----
+async def __call__(self, handler, event: Update, data)
+⋮----
+user = data.get("event_from_user")
+⋮----
+async def main() -> None
+⋮----
+s = get_settings()
+bot = Bot(s.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+dp = Dispatcher()
+ops = Docker(s)
+⋮----
+task = asyncio.create_task(monitor_loop(bot, ops, s))
+</file>
+
+<file path="app/monitor.py">
+log = logging.getLogger("monitor")
+BAD = {"exited", "dead", "restarting", "paused"}
+COOLDOWN = 1800  # повтор алерта по RAM/диску не чаще раза в 30 минут
+⋮----
+async def notify(bot: Bot, admins: list[int], text: str) -> None
+⋮----
+async def monitor_loop(bot: Bot, ops: Docker, s: Settings) -> None
+⋮----
+prev: dict[str, str] | None = None
+last_alert: dict[str, float] = {}
+⋮----
+alerts: list[str] = []
+items = await asyncio.to_thread(ops.list_containers)
+cur = {c["name"]: ("unhealthy" if c["unhealthy"] else c["status"]) for c in items}
+⋮----
+old = prev.get(name)
+⋮----
+prev = cur
+⋮----
+q = await asyncio.to_thread(system.quick)
+now = time.time()
+</file>
+
+<file path="app/system.py">
+GB = 1024**3
+⋮----
+def snapshot() -> dict
+⋮----
+def quick() -> dict
+⋮----
+def uptime(seconds: float) -> str
+⋮----
+s = int(seconds)
+⋮----
+m = s // 60
+⋮----
+def _mark(pct: float) -> str
+⋮----
+def format_snapshot(s: dict) -> str
+⋮----
+swap = (
+</file>
+
+<file path=".dockerignore">
+__pycache__/
+*.pyc
+.env
+.git
+.venv/
+</file>
+
+<file path=".env.example">
+# Отдельный бот из @BotFather (НЕ токен клиентского бота)
+BOT_TOKEN=123456:ABC
+# Твой Telegram ID (узнать: @userinfobot). Только эти люди получат доступ.
+ADMIN_IDS=[123456789]
+
+# Контейнеры, которые нельзя перезапускать из бота (admin-bot защищён всегда)
+PROTECTED_CONTAINERS=[]
+# Разрешить перезагрузку всего сервера кнопкой (по умолчанию выключено)
+ALLOW_HOST_REBOOT=false
+
+# Мониторинг и алерты
+MONITOR_INTERVAL=60
+RAM_ALERT_PERCENT=90
+DISK_ALERT_PERCENT=90
+</file>
+
+<file path=".gitignore">
+__pycache__/
+*.pyc
+.env
+.venv/
+</file>
+
+<file path="docker-compose.yml">
+services:
+  admin-bot:
+    build: .
+    container_name: admin-bot
+    restart: always
+    env_file: .env
+    volumes:
+      # ВНИМАНИЕ: доступ к docker.sock = root на хосте. Держи ADMIN_IDS строгим.
+      - /var/run/docker.sock:/var/run/docker.sock
+</file>
+
+<file path="Dockerfile">
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /srv
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app ./app
+CMD ["python", "-m", "app.main"]
+</file>
+
+<file path="README.md">
+# Admin bot: статус сервера и контейнеров
+
+Отдельный бот (long polling, портов наружу не открывает). Запускается на том же VPS, что и Marzban.
+
+## Возможности
+- 📊 CPU, load, RAM, swap, диск, аптайм
+- 🐳 Список контейнеров, по каждому: статус, CPU, RAM, аптайм, авто-рестарты, логи
+- ♻️ Перезапуск контейнера (с подтверждением)
+- ⚠️ Перезагрузка всего сервера (выключена по умолчанию, `ALLOW_HOST_REBOOT=true`)
+- 🚨 Авто-алерты: контейнер упал / unhealthy / исчез, RAM или диск выше порога
+
+## Запуск
+1. Создай НОВОГО бота в @BotFather (отдельный токен).
+2. `cp .env.example .env`, впиши `BOT_TOKEN` и свой `ADMIN_IDS` (ID узнаёт @userinfobot).
+3. `docker compose up -d --build`
+4. Напиши боту `/menu`.
+
+## Безопасность (важно)
+- Доступ к `docker.sock` равен root на сервере. Бот отвечает только тем, кто в `ADMIN_IDS`, остальных игнорирует молча.
+- Включи двухфакторную защиту на своём Telegram-аккаунте: кто получит аккаунт, получит и сервер.
+- Токен бота держи в секрете, при утечке перевыпусти через @BotFather (`/revoke`).
+- Контейнер `admin-bot` из бота перезапустить нельзя, плюс можно запретить другие через `PROTECTED_CONTAINERS`.
+- Все перезапуски пишутся в лог: `docker logs admin-bot`.
+- Перезагрузка сервера работает через одноразовый привилегированный контейнер `alpine` (образ скачается при первом использовании).
+</file>
+
+<file path="requirements.txt">
+aiogram>=3.13,<4
+docker>=7.1
+psutil>=6.0
+pydantic-settings>=2.3
+</file>
+
+</files>

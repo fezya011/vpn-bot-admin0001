@@ -1,0 +1,4 @@
+aiogram>=3.13,<4
+docker>=7.1
+psutil>=6.0
+pydantic-settings>=2.3
